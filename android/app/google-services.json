@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "786802683955",
+    "firebase_url": "https://horus-e1151-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "horus-e1151",
+    "storage_bucket": "horus-e1151.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:786802683955:android:bef9cd305a878fe1f5b346",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAZXXo2dFYUaVyu2Fz7zaHqpYoiQ6K4R60"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
