@@ -3,8 +3,10 @@ import '../utils/validators.dart';
 import 'signup_screen.dart';
 import 'home_shell.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'preferences_flow.dart';
+import '../services/google_sign_in_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,6 +23,11 @@ class _LoginScreenState extends State<LoginScreen>
   bool _isLoading = false;
   bool _isGoogleLoading = false;
   bool _submitted = false;
+
+  // ── Firebase instances ──────────────────────────────────────────────
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
+  final _googleSignIn = GoogleSignIn();
 
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
@@ -47,122 +54,122 @@ class _LoginScreenState extends State<LoginScreen>
     super.dispose();
   }
 
-  // ✅ LOGIN فقط — مش create
-  // void _submit() async {
-  //   setState(() => _submitted = true);
-  //   if (!_formKey.currentState!.validate()) return;
-  //   setState(() => _isLoading = true);
-
-  //   try {
-  //     await FirebaseAuth.instance.signInWithEmailAndPassword(
-  //       email: _emailController.text.trim(),
-  //       password: _passwordController.text.trim(),
-  //     );
-
-  //     if (!mounted) return;
-  //     await _goNext();
-
-  //   } on FirebaseAuthException catch (e) {
-  //     String msg = 'Login failed';
-  //     if (e.code == 'user-not-found') msg = 'User not found';
-  //     if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
-  //       msg = 'Wrong email or password';
-  //     }
-  //     if (!mounted) return;
-  //     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-  //       content: Text(msg, style: const TextStyle(fontFamily: 'Georgia')),
-  //       backgroundColor: const Color(0xFFCC3300),
-  //     ));
-  //   } finally {
-  //     if (mounted) setState(() => _isLoading = false);
-  //   }
-  // }
+  // ── Email/Password Login ────────────────────────────────────────────
   Future<void> _submit() async {
-  setState(() => _submitted = true);
-  if (!_formKey.currentState!.validate()) return;
-  Navigator.pushReplacement(
-    context,
-    PageRouteBuilder(
-      pageBuilder: (_, __, ___) => const PreferencesFlow(),
-      transitionDuration: const Duration(milliseconds: 500),
-      transitionsBuilder: (_, anim, __, child) =>
-          FadeTransition(opacity: anim, child: child),
-    ),
-  );
-}
+    setState(() => _submitted = true);
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
 
-  void _signInWithGoogle() async {
-    setState(() => _isGoogleLoading = true);
     try {
-      final credential = await FirebaseAuth.instance
-          .signInWithProvider(GoogleAuthProvider());
+      await _auth.signInWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
 
-      final user = credential.user!;
-      final doc = await FirebaseFirestore.instance
-          .collection('users').doc(user.uid).get();
-
-      if (!doc.exists) {
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-          'name': user.displayName ?? '',
-          'email': user.email ?? '',
-          'stats': {'places_visited': 0, 'trips_created': 0},
-          'travel_style': {'companion': '', 'interests': [], 'pace': ''},
-          'preferences_completed': false,
-          'created_at': FieldValue.serverTimestamp(),
-        });
+      if (!mounted) return;
+      _goToHome();
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      String msg = 'Login failed. Please try again.';
+      if (e.code == 'user-not-found') msg = 'No account found with this email.';
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        msg = 'Wrong email or password.';
       }
-
-      if (!mounted) return;
-      await _goNext();
-
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Google sign-in failed',
-            style: TextStyle(fontFamily: 'Georgia')),
-        backgroundColor: Color(0xFFCC3300),
-      ));
+      if (e.code == 'invalid-email') msg = 'Invalid email address.';
+      if (e.code == 'network-request-failed') msg = 'No internet connection.';
+      _showError(msg);
     } finally {
-      if (mounted) setState(() => _isGoogleLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _goNext() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  // ── Google Sign In (mobile-safe using google_sign_in package) ───────
+  Future<void> _signInWithGoogle() async {
+  setState(() => _isGoogleLoading = true);
+  try {
+    final user = await GoogleSignInService.signIn();
+    if (user == null) return; // user cancelled
 
-    final docRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+    final docRef = _firestore.collection('users').doc(user.uid);
     final doc = await docRef.get();
 
     if (!doc.exists) {
       await docRef.set({
+        'uid': user.uid,
         'name': user.displayName ?? '',
         'email': user.email ?? '',
+        'photoUrl': user.photoURL,
+        'provider': 'google',
         'stats': {'places_visited': 0, 'trips_created': 0},
         'travel_style': {'companion': '', 'interests': [], 'pace': ''},
         'preferences_completed': false,
         'created_at': FieldValue.serverTimestamp(),
       });
       if (!mounted) return;
-      Navigator.pushReplacement(context, PageRouteBuilder(
+      _goToHome();
+      return;
+    }
+
+    if (!mounted) return;
+    final bool completed = doc.data()?['preferences_completed'] ?? false;
+    completed ?_goToPreferences() : _goToHome();
+
+  } catch (e) {
+    if (!mounted) return;
+    _showError('Google sign-in failed. Please try again.');
+  } finally {
+    if (mounted) setState(() => _isGoogleLoading = false);
+  }
+}
+
+  // ── Navigation ──────────────────────────────────────────────────────
+  void _goToHome() {
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => const HomeShell(),
+        transitionDuration: const Duration(milliseconds: 500),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+      ),
+    );
+  }
+
+  void _goToPreferences() {
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
         pageBuilder: (_, __, ___) => const PreferencesFlow(),
         transitionDuration: const Duration(milliseconds: 500),
         transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
-      ));
-      return;
+      ),
+    );
+  }
+
+  // ── Error helpers ───────────────────────────────────────────────────
+  String _getGoogleErrorMessage(String code) {
+    switch (code) {
+      case 'account-exists-with-different-credential':
+        return 'This email is registered with a different sign-in method.';
+      case 'network-request-failed':
+        return 'No internet connection. Please check your network.';
+      default:
+        return 'Google sign-in failed. Please try again.';
     }
+  }
 
-    final bool completed = doc.data()?['preferences_completed'] ?? false;
-    if (!mounted) return;
-
-    Navigator.pushReplacement(context, PageRouteBuilder(
-      pageBuilder: (_, __, ___) =>
-          completed ? const HomeShell() : const PreferencesFlow(),
-      transitionDuration: const Duration(milliseconds: 500),
-      transitionsBuilder: (_, anim, __, child) =>
-          FadeTransition(opacity: anim, child: child),
-    ));
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message,
+            style: const TextStyle(fontFamily: 'Georgia', color: Colors.white)),
+        backgroundColor: const Color(0xFFCC3300),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   @override
@@ -247,7 +254,6 @@ class _LoginScreenState extends State<LoginScreen>
                                 children: [
                                   const _FormDividerTitle(label: 'SIGN IN'),
                                   const SizedBox(height: 20),
-
                                   const _FieldLabel(label: 'EMAIL ADDRESS'),
                                   const SizedBox(height: 8),
                                   _KemetFormField(
@@ -258,7 +264,6 @@ class _LoginScreenState extends State<LoginScreen>
                                     validator: KemetValidators.email,
                                   ),
                                   const SizedBox(height: 16),
-
                                   Row(
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
@@ -294,7 +299,6 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                   ),
                                   const SizedBox(height: 24),
-
                                   _KemetButton(
                                     label: 'Enter the Kingdom',
                                     isLoading: _isLoading,
