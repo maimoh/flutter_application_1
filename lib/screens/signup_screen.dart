@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/validators.dart';
 import 'login_screen.dart';
 import 'preferences_flow.dart';
+import '../services/google_sign_in_service.dart';
+
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -96,55 +98,41 @@ class _SignupScreenState extends State<SignupScreen>
 
   // ── Google Sign In ──────────────────────────────────────────────────
   Future<void> _signInWithGoogle() async {
-    setState(() => _isGoogleLoading = true);
-    try {
-      // 1. Trigger Google Sign In flow
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        // User cancelled
-        setState(() => _isGoogleLoading = false);
-        return;
-      }
+  setState(() => _isGoogleLoading = true);
+  try {
+    final user = await GoogleSignInService.signIn();
+    if (user == null) return; // user cancelled
 
-      // 2. Get auth credentials
-      final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
+    final docRef = _firestore.collection('users').doc(user.uid);
+    final doc = await docRef.get();
 
-      // 3. Sign in to Firebase
-      final userCredential = await _auth.signInWithCredential(credential);
-      final user = userCredential.user!;
-
-      // 4. Save/update user in Firestore (only on first sign up)
-      final docRef = _firestore.collection('users').doc(user.uid);
-      final docSnap = await docRef.get();
-      if (!docSnap.exists) {
-        await docRef.set({
-          'uid': user.uid,
-          'name': user.displayName ?? '',
-          'email': user.email ?? '',
-          'photoUrl': user.photoURL,
-          'provider': 'google',
-          'createdAt': FieldValue.serverTimestamp(),
-          'preferencesCompleted': false,
-        });
-      }
+    if (!doc.exists) {
+      await docRef.set({
+        'uid': user.uid,
+        'name': user.displayName ?? '',
+        'email': user.email ?? '',
+        'photoUrl': user.photoURL,
+        'provider': 'google',
+        'stats': {'places_visited': 0, 'trips_created': 0},
+        'travel_style': {'companion': '', 'interests': [], 'pace': ''},
+        'preferences_completed': false,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+      if (!mounted) return;
+      _goToPreferences();
+      return;
+    }
 
       if (!mounted) return;
       _goToPreferences();
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      _showError(_getAuthErrorMessage(e.code));
-    } catch (e) {
-      if (!mounted) return;
-      _showError('Google sign in failed. Please try again.');
-    } finally {
-      if (mounted) setState(() => _isGoogleLoading = false);
-    }
-  }
 
+  } catch (e) {
+    if (!mounted) return;
+    _showError('Google sign-in failed. Please try again.');
+  } finally {
+    if (mounted) setState(() => _isGoogleLoading = false);
+  }
+}
   // ── Helpers ─────────────────────────────────────────────────────────
   String _getAuthErrorMessage(String code) {
     switch (code) {
