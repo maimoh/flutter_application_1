@@ -5,11 +5,12 @@ class Attraction {
   final String name;
   final String location;
   final String category;
-  final String categoryColor; // hex
+  final String categoryColor;
   final double rating;
   final int price;
   final String imageUrl;
   final String pace;
+  final String about;
 
   const Attraction({
     required this.id,
@@ -21,10 +22,48 @@ class Attraction {
     required this.price,
     required this.imageUrl,
     required this.pace,
+    this.about = '',
   });
-}
 
-// ── Static sample data ─────────────────────────────────────────────────
+  factory Attraction.fromFirestore(String id, Map<String, dynamic> d) {
+    // location هي Map
+    final loc = d['location'];
+    String locationStr = '';
+    if (loc is String) {
+      locationStr = loc;
+    } else if (loc is Map) {
+      locationStr = loc['city'] ?? '';
+    }
+
+    // price هي Map
+    final priceData = d['price'];
+    int priceInt = 0;
+    if (priceData is num) {
+      priceInt = priceData.toInt();
+    } else if (priceData is Map) {
+      priceInt = (priceData['foreigner'] as num?)?.toInt() ?? 0;
+    }
+
+    // category بتيجي من tags
+    final tags = List<String>.from(d['tags'] ?? []);
+    final category = tags.isNotEmpty ? tags[0] : '';
+
+    return Attraction(
+      id:            id,
+      name:          d['name']      ?? '',
+      location:      locationStr,
+      category:      category,
+      categoryColor: 'D4941A',
+      rating:        (d['rating'] as num?)?.toDouble() ?? 0.0,
+      price:         priceInt,
+      pace:          d['pace']      ?? 'medium',
+      imageUrl:      d['image_url'] ?? d['photo_url'] ?? '',
+      about:         d['about']     ?? d['description'] ?? '',
+    );
+  }
+} // ← نهاية class Attraction
+
+// ── Static sample data ────────────────────────────────────────────────
 const List<Attraction> kAttractions = [
   Attraction(
     id: '1',
