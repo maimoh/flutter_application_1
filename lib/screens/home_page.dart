@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'home_shell.dart';
 import '../data/app_state.dart';
 import '../services/firestore_service.dart';
-import 'my_trip_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -378,13 +377,8 @@ class _NewUserBanner extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           GestureDetector(
-  onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const MyTripPage(),
-    ),
-  );
+            onTap: () {
+  ShellNavigator.of(context).goToTab(1);
 },
             child: Container(
               padding:
