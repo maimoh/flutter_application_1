@@ -1,4 +1,6 @@
 // app_state.dart — shared state بين Home وـ My Trip
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 class Attraction {
   final String id;
@@ -151,4 +153,28 @@ class AppCart {
 
   void remove(String id) => items.removeWhere((a) => a.id == id);
   void clear() => items.clear();
+}
+
+// ── Trip model ────────────────────────────────────────────────────────
+class Trip {
+  final String id;
+  final String title;
+  final String destination;
+  final DateTime createdAt;
+
+  Trip({
+    required this.id,
+    required this.title,
+    required this.destination,
+    required this.createdAt,
+  });
+
+  factory Trip.fromMap(String id, Map<String, dynamic> map) {
+    return Trip(
+      id:          id,
+      title:       map['title']       ?? 'My Trip',
+      destination: map['destination'] ?? '',
+      createdAt:   (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
 }
