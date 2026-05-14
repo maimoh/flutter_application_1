@@ -74,14 +74,65 @@ class _SignupScreenState extends State<SignupScreen>
 
       // 3. Save user data in Firestore
       await _firestore.collection('users').doc(credential.user!.uid).set({
-        'uid': credential.user!.uid,
-        'name': _nameController.text.trim(),
-        'email': _emailController.text.trim(),
-        'photoUrl': null,
-        'provider': 'email',
-        'createdAt': FieldValue.serverTimestamp(),
-        'preferencesCompleted': false,
-      });
+  'uid': credential.user!.uid,
+  'user_id': credential.user!.uid,
+
+  'name': _nameController.text.trim(),
+  'email': _emailController.text.trim(),
+
+  'photoUrl': null,
+  'provider': 'email',
+
+  'created_at': FieldValue.serverTimestamp(),
+
+  // preferences
+  'preferences_completed': false,
+
+  // stats
+  'stats': {
+    'places_visited': 0,
+    'posts_shared': 0,
+    'trips_done': 0,
+  },
+
+  // interests stats
+  'interest_stats': {
+    'pharaonic': 0,
+    'islamic': 0,
+    'coptic': 0,
+    'natural': 0,
+    'modern': 0,
+  },
+
+  // travel style
+  'travel_style': {
+    'interests': [],
+    'pace': '',
+    'companion': '',
+    'primary_interest': '',
+
+    'interest_percentages': {
+      'pharaonic': 0,
+      'islamic': 0,
+      'coptic': 0,
+      'natural': 0,
+      'modern': 0,
+    },
+
+    'pace_percentages': {
+      'quick': 0,
+      'medium': 0,
+      'slow': 0,
+    },
+
+    'companion_percentages': {
+      'solo': 0,
+      'partner': 0,
+      'family': 0,
+      'friends': 0,
+    },
+  },
+});
 
       if (!mounted) return;
       _goToPreferences();
@@ -108,16 +159,65 @@ class _SignupScreenState extends State<SignupScreen>
 
     if (!doc.exists) {
       await docRef.set({
-        'uid': user.uid,
-        'name': user.displayName ?? '',
-        'email': user.email ?? '',
-        'photoUrl': user.photoURL,
-        'provider': 'google',
-        'stats': {'places_visited': 0, 'trips_created': 0},
-        'travel_style': {'companion': '', 'interests': [], 'pace': ''},
-        'preferences_completed': false,
-        'created_at': FieldValue.serverTimestamp(),
-      });
+  'uid': user.uid,
+  'user_id': user.uid,
+
+  'name': user.displayName ?? '',
+  'email': user.email ?? '',
+
+  'photoUrl': user.photoURL,
+  'provider': 'google',
+
+  'created_at': FieldValue.serverTimestamp(),
+
+  // preferences
+  'preferences_completed': false,
+
+  // stats
+  'stats': {
+    'places_visited': 0,
+    'posts_shared': 0,
+    'trips_done': 0,
+  },
+
+  // interests stats
+  'interest_stats': {
+    'pharaonic': 0,
+    'islamic': 0,
+    'coptic': 0,
+    'natural': 0,
+    'modern': 0,
+  },
+
+  // travel style
+  'travel_style': {
+    'interests': [],
+    'pace': '',
+    'companion': '',
+    'primary_interest': '',
+
+    'interest_percentages': {
+      'pharaonic': 0,
+      'islamic': 0,
+      'coptic': 0,
+      'natural': 0,
+      'modern': 0,
+    },
+
+    'pace_percentages': {
+      'quick': 0,
+      'medium': 0,
+      'slow': 0,
+    },
+
+    'companion_percentages': {
+      'solo': 0,
+      'partner': 0,
+      'family': 0,
+      'friends': 0,
+    },
+  },
+});
       if (!mounted) return;
       _goToPreferences();
       return;
