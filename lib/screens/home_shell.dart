@@ -4,8 +4,7 @@ import 'home_page.dart';
 import 'my_trip_page.dart';
 
 // ══════════════════════════════════════════════════════════════════════
-// CartProvider — InheritedWidget يشيل الـ cart state وبيعدّيه
-// لكل الـ pages من غير ما كل صفحة تعمل instance جديدة
+// CartProvider
 // ══════════════════════════════════════════════════════════════════════
 class CartProvider extends InheritedNotifier<CartNotifier> {
   const CartProvider({
@@ -14,11 +13,15 @@ class CartProvider extends InheritedNotifier<CartNotifier> {
     required super.child,
   });
 
-  static CartNotifier of(BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<CartProvider>()!
-        .notifier!;
-  }
+  static CartNotifier? maybeOf(BuildContext context) {
+  return context
+      .dependOnInheritedWidgetOfExactType<CartProvider>()
+      ?.notifier;
+}
+
+static CartNotifier of(BuildContext context) {
+  return maybeOf(context)!;
+}
 }
 
 class CartNotifier extends ChangeNotifier {
@@ -50,6 +53,27 @@ class CartNotifier extends ChangeNotifier {
 }
 
 // ══════════════════════════════════════════════════════════════════════
+// ShellNavigator — بيخلي أي widget يغير الـ tab من أي مكان
+// ══════════════════════════════════════════════════════════════════════
+class ShellNavigator extends InheritedWidget {
+  final void Function(int) goToTab;
+
+  const ShellNavigator({
+    super.key,
+    required this.goToTab,
+    required super.child,
+  });
+
+  static ShellNavigator of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<ShellNavigator>()!;
+  }
+
+  @override
+  bool updateShouldNotify(ShellNavigator oldWidget) =>
+      goToTab != oldWidget.goToTab;
+}
+
+// ══════════════════════════════════════════════════════════════════════
 // HomeShell
 // ══════════════════════════════════════════════════════════════════════
 class HomeShell extends StatefulWidget {
@@ -73,21 +97,24 @@ class _HomeShellState extends State<HomeShell> {
   Widget build(BuildContext context) {
     return CartProvider(
       notifier: _cartNotifier,
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF5F0E8),
-        body: IndexedStack(
-          index: _currentIndex,
-          children: const [
-            HomePage(),
-            MyTripPage(),
-            _CommunityPage(),
-            _ProfilePage(),
-          ],
-        ),
-        bottomNavigationBar: _BottomNav(
-          currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
-          cartNotifier: _cartNotifier,
+      child: ShellNavigator(
+        goToTab: (i) => setState(() => _currentIndex = i),
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF5F0E8),
+          body: IndexedStack(
+            index: _currentIndex,
+            children: const [
+              HomePage(),
+              MyTripPage(),
+              _CommunityPage(),
+              _ProfilePage(),
+            ],
+          ),
+          bottomNavigationBar: _BottomNav(
+            currentIndex: _currentIndex,
+            onTap: (i) => setState(() => _currentIndex = i),
+            cartNotifier: _cartNotifier,
+          ),
         ),
       ),
     );
@@ -133,7 +160,6 @@ class _BottomNav extends StatelessWidget {
                 isActive: currentIndex == 0,
                 onTap: () => onTap(0),
               ),
-              // My Trip with badge
               ListenableBuilder(
                 listenable: cartNotifier,
                 builder: (_, __) => _NavItemBadge(
@@ -204,9 +230,8 @@ class _NavItem extends StatelessWidget {
             ),
             Icon(
               isActive ? activeIcon : icon,
-              color: isActive
-                  ? const Color(0xFFD4941A)
-                  : Colors.grey.shade500,
+              color:
+                  isActive ? const Color(0xFFD4941A) : Colors.grey.shade500,
               size: 24,
             ),
             const SizedBox(height: 3),
