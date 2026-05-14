@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'home_shell.dart';
 import '../data/app_state.dart';
 import '../services/firestore_service.dart';
+import 'my_trip_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,6 +17,7 @@ class _HomePageState extends State<HomePage> {
   String _searchQuery = '';
   List<Attraction> _allAttractions = [];
   List<RecommendedAttraction> _recommendations = [];
+  List<Trip> _userTrips = [];          // ← جديد
   bool _loading = true;
   String? _error;
 
@@ -31,26 +33,24 @@ class _HomePageState extends State<HomePage> {
       final results = await Future.wait([
         _service.fetchAttractions(),
         _service.getRecommendations(),
+        _service.fetchUserTrips(),       // ← جديد
       ]);
       setState(() {
         _allAttractions  = results[0] as List<Attraction>;
         _recommendations = results[1] as List<RecommendedAttraction>;
+        _userTrips       = results[2] as List<Trip>;   // ← جديد
         _loading         = false;
       });
     } catch (e) {
       setState(() { _error = e.toString(); _loading = false; });
     }
-    
   }
 
   List<Attraction> get _trending {
- final sorted = [..._allAttractions]
-   ..sort(
-      (a,b)=>b.rating.compareTo(a.rating)
-   );
-
- return sorted.take(5).toList();
-}
+    final sorted = [..._allAttractions]
+      ..sort((a, b) => b.rating.compareTo(a.rating));
+    return sorted.take(5).toList();
+  }
 
   List<Attraction> get _searchResults {
     if (_searchQuery.isEmpty) return [];
@@ -89,32 +89,27 @@ class _HomePageState extends State<HomePage> {
             children: [
               const Icon(Icons.wifi_off, size: 48, color: Color(0xFF8B7355)),
               const SizedBox(height: 12),
-              const Text('Failed to load data',        // ← السطر ده موجود
-              style: TextStyle(fontFamily: 'Georgia', fontSize: 16)),
-          const SizedBox(height: 8),
-          
-          // ✅ أضيفي الجزء ده هنا بين النصين
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: 11,
-                  color: Colors.red),
-            ),
-          ),
-          // ✅ خلصت هنا
-          
-          ElevatedButton(                           // ← ده موجود
-            onPressed: _loadData,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFD4941A),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20)),
-            ),
-            child: const Text('Retry', style: TextStyle(fontFamily: 'Georgia'))),
+              const Text('Failed to load data',
+                  style: TextStyle(fontFamily: 'Georgia', fontSize: 16)),
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                child: Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontFamily: 'Georgia', fontSize: 11, color: Colors.red),
+                ),
+              ),
+              ElevatedButton(
+                  onPressed: _loadData,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD4941A),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
+                  ),
+                  child: const Text('Retry',
+                      style: TextStyle(fontFamily: 'Georgia'))),
             ],
           ),
         ),
@@ -182,7 +177,15 @@ class _HomePageState extends State<HomePage> {
 
             // ── Normal mode ────────────────────────────────────────
             if (_searchQuery.isEmpty) ...[
-              // Trending Now
+
+              // ── Hero Banner: new user vs returning user ──────────
+              SliverToBoxAdapter(
+                child: _userTrips.isEmpty
+                    ? const _NewUserBanner()
+                    : _ReturningUserBanner(trips: _userTrips),
+              ),
+
+              // ── Trending Now ─────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
@@ -215,7 +218,7 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
 
-              // Recommended For You
+              // ── Recommended For You ──────────────────────────────
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(20, 24, 20, 4),
@@ -274,7 +277,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
 
-              // Explore Egypt Map
+              // ── Explore Egypt Map ────────────────────────────────
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(20, 24, 20, 12),
@@ -325,6 +328,244 @@ String _tagLabel(RecTag tag) {
       return '✦ Others who liked your picks also liked this';
     case RecTag.popular:
       return '✦ Popular in Egypt';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Banner: يوزر جديد (مفيش رحلات)
+// ══════════════════════════════════════════════════════════════════════
+class _NewUserBanner extends StatelessWidget {
+  const _NewUserBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1B3A6B), Color(0xFF2B5AA0)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1B3A6B).withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '✈  Plan your next adventure',
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontFamily: 'Georgia',
+                fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Let AI build your perfect Egypt itinerary',
+            style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.8),
+                fontSize: 13,
+                fontFamily: 'Georgia'),
+          ),
+          const SizedBox(height: 16),
+          GestureDetector(
+  onTap: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const TripDetailsPage(),
+      ),
+    );
+  },
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFD4941A),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: const Text(
+                '+ Create new trip',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontFamily: 'Georgia',
+                    fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Banner: يوزر قديم (عنده رحلات)
+// ══════════════════════════════════════════════════════════════════════
+class _ReturningUserBanner extends StatelessWidget {
+  final List<Trip> trips;
+  const _ReturningUserBanner({required this.trips});
+
+  @override
+  Widget build(BuildContext context) {
+    final latest = trips.first;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Header row ──────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const _SectionTitle(label: 'Continue planning'),
+              GestureDetector(
+                onTap: () {
+                  // TODO: Navigator.pushNamed(context, '/my-trips');
+                },
+                child: const Text(
+                  'see all',
+                  style: TextStyle(
+                      color: Color(0xFF2B6CB0),
+                      fontSize: 14,
+                      fontFamily: 'Georgia'),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // ── Trip card ────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.07),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4))
+              ],
+            ),
+            child: Row(
+              children: [
+                // Icon box
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4941A).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.map_outlined,
+                      color: Color(0xFFD4941A), size: 28),
+                ),
+                const SizedBox(width: 14),
+                // Title + destination
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        latest.title,
+                        style: const TextStyle(
+                            color: Color(0xFF1A0E08),
+                            fontSize: 16,
+                            fontFamily: 'Georgia',
+                            fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        latest.destination,
+                        style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 13,
+                            fontFamily: 'Georgia'),
+                      ),
+                    ],
+                  ),
+                ),
+                // Action icons (share / like / bookmark)
+                Row(children: [
+                  Icon(Icons.share_outlined,
+                      size: 20, color: Colors.grey.shade400),
+                  const SizedBox(width: 12),
+                  Icon(Icons.favorite_border,
+                      size: 20, color: Colors.grey.shade400),
+                  const SizedBox(width: 12),
+                  Icon(Icons.bookmark_border,
+                      size: 20, color: Colors.grey.shade400),
+                ]),
+              ],
+            ),
+          ),
+        ),
+
+        // ── Get Inspired banner ──────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1B3A6B).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: const Color(0xFF1B3A6B).withValues(alpha: 0.15)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Get inspired for your trip to ${latest.destination}',
+                        style: const TextStyle(
+                            color: Color(0xFF1B3A6B),
+                            fontSize: 14,
+                            fontFamily: 'Georgia',
+                            fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: () {
+                          // TODO: navigate to community
+                        },
+                        child: const Text(
+                          'Explore community →',
+                          style: TextStyle(
+                              color: Color(0xFFD4941A),
+                              fontSize: 13,
+                              fontFamily: 'Georgia',
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Icon(Icons.explore_outlined,
+                    color: Color(0xFF1B3A6B), size: 32),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 
@@ -397,8 +638,8 @@ class _Header extends StatelessWidget {
                     color: Colors.grey.shade500,
                     fontFamily: 'Georgia',
                     fontSize: 14),
-                prefixIcon: Icon(Icons.search,
-                    color: Colors.grey.shade500, size: 20),
+                prefixIcon:
+                    Icon(Icons.search, color: Colors.grey.shade500, size: 20),
                 suffixIcon: searchController.text.isNotEmpty
                     ? IconButton(
                         icon: Icon(Icons.close,
@@ -705,16 +946,20 @@ class _MapPlaceholder extends StatelessWidget {
                     painter: _MapGridPainter(),
                     size: const Size(double.infinity, 200)),
                 Positioned(
-                    left: 90, top: 70,
+                    left: 90,
+                    top: 70,
                     child: _MapPin(color: const Color(0xFF1B3A6B))),
                 Positioned(
-                    left: 70, top: 85,
+                    left: 70,
+                    top: 85,
                     child: _MapPin(color: const Color(0xFF2E8B57))),
                 Positioned(
-                    left: 220, top: 110,
+                    left: 220,
+                    top: 110,
                     child: _MapPin(color: const Color(0xFF1B3A6B))),
                 Positioned(
-                    left: 240, top: 125,
+                    left: 240,
+                    top: 125,
                     child: _MapPin(color: const Color(0xFF2E8B57))),
               ]),
             ),
@@ -775,7 +1020,8 @@ class _MapPin extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 34, height: 34,
+      width: 34,
+      height: 34,
       decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
@@ -801,6 +1047,7 @@ class _MapGridPainter extends CustomPainter {
     for (double y = 0; y < size.height; y += 40)
       canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
   }
+
   @override
   bool shouldRepaint(_) => false;
 }
@@ -812,7 +1059,8 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(children: [
       Container(
-          width: 4, height: 22,
+          width: 4,
+          height: 22,
           decoration: BoxDecoration(
               color: const Color(0xFFD4941A),
               borderRadius: BorderRadius.circular(2))),
@@ -840,8 +1088,7 @@ class _CategoryBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-          color: _fromHex(colorHex),
-          borderRadius: BorderRadius.circular(20)),
+          color: _fromHex(colorHex), borderRadius: BorderRadius.circular(20)),
       child: Text(label,
           style: const TextStyle(
               color: Colors.white,
