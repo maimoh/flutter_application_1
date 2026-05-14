@@ -379,13 +379,13 @@ class _NewUserBanner extends StatelessWidget {
           const SizedBox(height: 16),
           GestureDetector(
   onTap: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const TripDetailsPage(),
-      ),
-    );
-  },
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const MyTripPage(),
+    ),
+  );
+},
             child: Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
